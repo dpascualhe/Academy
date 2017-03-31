@@ -1,9 +1,12 @@
-import numpy as np
-import threading
 import time
+import threading
 from datetime import datetime
 
-time_cycle = 80
+import cv2
+import numpy as np
+
+
+time_cycle = 120
 
 class MyAlgorithm(threading.Thread):
 
@@ -17,6 +20,10 @@ class MyAlgorithm(threading.Thread):
         self.kill_event = threading.Event()
         self.lock = threading.Lock()
         threading.Thread.__init__(self, args=self.stop_event)
+        
+        self.first_frame = 1
+        self.abs_center = 0
+        self.derivator = 0
 
     def setRightImageFiltered(self, image):
         self.lock.acquire()
@@ -70,23 +77,77 @@ class MyAlgorithm(threading.Thread):
     def kill (self):
         self.kill_event.set()
 
-
     def execute(self):
-        #GETTING THE IMAGES
-        imageLeft = self.cameraL.getImage()
-        imageRight = self.cameraR.getImage()
+        im = self.cameraL.getImage() # Getting the images.
 
-
-        # Add your code here
         print ("Running")
 
-        #EXAMPLE OF HOW TO SEND INFORMATION TO THE ROBOT ACTUATORS
-        #self.motors.setV(10)
-        #self.motors.setW(5)
-        #self.motors.sendVelocities()
+        # We "threshold" the HSV image to segment the line.
+        im_hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
 
+        hsv_max = np.array([120, 255, 255])
+        hsv_min = np.array([110, 245, 0])
+        
+        mask = cv2.inRange(im_hsv, hsv_min, hsv_max)
+        im_line = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+        
+        # We obtain the points that we're going to use as a
+        # reference to check whether we are centered or not.
+        lower_row = mask[360,:]
+        upper_row = mask[280,:]
 
-        #SHOW THE FILTERED IMAGE ON THE GUI
-        self.setRightImageFiltered(imageRight)
-        self.setLeftImageFiltered(imageLeft)
+        if self.first_frame:
+            self.abs_center = np.mean(np.where(lower_row == 255))
+            self.first_frame = 0
+        
+        lower_indices = np.where(lower_row == 255)
+        if lower_indices[0].any():
+            tmp_lower_center = np.mean(lower_indices)
+        else:
+            tmp_lower_center = self.abs_center
+
+        upper_indices = np.where(upper_row == 255)
+        if upper_indices[0].any():
+            tmp_upper_center = np.mean(upper_indices)
+        else:
+            tmp_upper_center = tmp_lower_center      
+
+        # Normalizing error value.    
+        error = self.abs_center - tmp_lower_center
+        if error > 0:
+            error /= mask.shape[1] - self.abs_center
+        else:
+            error /= self.abs_center
+
+        # PD control.
+        kp = 1
+        kd = 4
+        if (abs(tmp_upper_center - tmp_lower_center) > 30):
+            v = 2
+        elif (abs(30 > tmp_upper_center - tmp_lower_center) > 10):
+            v = 4  
+        else:
+            v = 6
+
+        if error:
+            print("error: " + str(error))
+            p = kp * error
+            d = kd * (error - self.derivator)
+            
+            w = p + d
+        else:
+            w = 0
+        
+        self.derivator = error
+
+        # Sending parameters to actuators.
+        self.motors.setV(v)
+        self.motors.setW(w)
+        self.motors.sendVelocities()
+        
+        im_line[:,tmp_lower_center] = [255, 0, 0]
+        im_line[:,tmp_uppper_center] = [0, 0, 255]
+        im_line[:,self.abs_center] = [0, 255, 0]
+        self.setLeftImageFiltered(im_line) # Displaying filtered image.
+
 
