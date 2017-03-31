@@ -60,12 +60,62 @@ class MyAlgorithm(threading.Thread):
         self.kill_event.set()
 
     def execute(self):
-       # Add your code here
+        # We get the image 
+        im = self.camera.getImage()
 
-        input_image = self.camera.getImage()
-        if input_image is not None:
-            self.camera.setColorImage(input_image)
-            '''
-            If you want show a threshold image (black and white image)
-            self.camera.setThresholdImage(bk_image)
+        if im is not None:
+            # We blur the image in order to avoid noise
+            kernel = (5, 5)
+            im_blur = cv2.GaussianBlur(im, kernel, 0)
+            
+            # We convert the image to HSV color space to avoid a negative
+            # influence of the variable ilumination
+            im_hsv = cv2.cvtColor(im_blur, cv2.COLOR_BGR2HSV)
+            
+            # We "threshold" the HSV image to segment the red ball
+            if self.video == "drone1":
+                hsv_max_red = np.array([180, 255, 205])
+                hsv_min_red = np.array([100, 135, 76])
+            else:    
+                hsv_max_red = np.array([140, 255, 215])
+                hsv_min_red = np.array([120, 230, 115])
+            
+            im_filter_red = cv2.inRange(im_hsv, hsv_min_red, hsv_max_red)
+            im_copy_red = np.copy(im_filter_red)            
+            
+            # We "threshold" the HSV image to segment the blue ball
+            im_filter_blue = im_filter_red
+            if self.video == "pelotas_roja_azul":                
+                hsv_max_blue = np.array([100, 255, 190])
+                hsv_min_blue = np.array([0, 80, 60])
+                im_filter_blue = cv2.inRange(im_hsv, hsv_min_blue, hsv_max_blue)
+            im_copy_blue = np.copy(im_filter_blue)            
+            
+            # We display the b&w image with the segmented objects
+            self.camera.setThresholdImage(im_filter_red+im_filter_blue)
+            
+            # We find the contours and draw the detected objects
+            im_cont_red, cont_red, h_red= cv2.findContours(im_copy_red,cv2.RETR_TREE, 
+                                       cv2.CHAIN_APPROX_SIMPLE)
+
+            for i in cont_red:
+                if cv2.contourArea(i)>= 100 and cv2.contourArea(i)<= 1000:
+                    xr,yr,wr,hr = cv2.boundingRect(i)
+                    cv2.rectangle(im,(xr,yr),(xr+wr,yr+hr),(0,255,0),2)
+                    print("Red ball coordinates: x=" + str((2*xr + wr)/2) + "; y="
+                          + str((2*yr + hr)/2))
+            
+            # im_cont_blue, cont_blue, hier_blue = cv2.findContours(im_copy_blue,
+                                                               #- cv2.RETR_TREE,
+                                                               # cv2.CHAIN_APPROX_SIMPLE)
+            #---------------------- xb,yb,wb,hb = cv2.boundingRect(im_cont_blue)
+#------------------------------------------------------------------------------ 
+            #----------------- # We calculate the center of the detected regions
+            #--------------- cv2.rectangle(im,(xb,yb),(xb+wb,yb+hb),(0,255,0),2)
+#------------------------------------------------------------------------------ 
+            #--- print("Blue ball coordinates: x=" + str((2*xb + wb)/2) + "; y="
+                  #--------------------------------------- + str((2*yb + hb)/2))
+#------------------------------------------------------------------------------ 
+            # We display the color image
+            self.camera.setColorImage(im)       
             '''
