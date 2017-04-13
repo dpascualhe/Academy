@@ -119,9 +119,38 @@ class MyAlgorithm(threading.Thread):
 
 
     def execute(self):
+        # We get the destination coordinates.
         self.currentTarget=self.getNextTarget()
         self.targetx = self.currentTarget.getPose().x
         self.targety = self.currentTarget.getPose().y
+        
+        # We get the car coordinates and orientation.
+        myx = self.pose3d.getX()/1000.
+        myy = self.pose3d.getY()/1000.
+        myyaw = self.pose3d.getYaw()
+        
+        
+        # We get the laser data.
+        laser_data = self.laser.getLaserData()
+        laser = []
+        i = 0
+        for i in range(laser_data.numLaser):
+            distance = laser_data.distanceData[i]/1000.
+            yaw = math.radians(i)-math.pi/2
+            laser += [(distance, yaw)]
+            i += 1            
+        
+        print("Car coordinates: " + str(myx) + ", " + str(myy))
+        print("Car position: " + str(myyaw))
+        print("Target coordinates: " + str(self.targetx) + ", "
+              + str(self.targety))
+        print("Laser data: " + str(laser))
+        
+        v = 3
+        w = 0
+        # We set the car velocities.
+        self.motors.setV(v)
+        self.motors.setW(w)
 
-        # TODO
+        
 
