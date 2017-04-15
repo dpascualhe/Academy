@@ -133,24 +133,41 @@ class MyAlgorithm(threading.Thread):
         # We get the laser data.
         laser_data = self.laser.getLaserData()
         laser = []
-        i = 0
         for i in range(laser_data.numLaser):
             distance = laser_data.distanceData[i]/1000.
-            yaw = math.radians(i)-math.pi/2
+            yaw = math.radians(i) - math.pi
             laser += [(distance, yaw)]
-            i += 1            
+            
+        # We enlarge the obstacles.
+        car_radius = 1
+        for i in range(len(laser)):
+            data = list(laser[i])
+            data[0] = data[0] - car_radius
+            laser[i] = tuple(data)
+            
+        # Car direction
+        self.carx = self.targetx - myx
+        self.cary = self.targety - myy
+
+        # Obstacles direction
+        x = 0
+        y = 0
+        for i in range(len(laser)):
+            x += laser[i][0]*math.cos(laser[i][1])
+            y += laser[i][0]*math.sin(laser[i][1]) 
+        self.obsx = x/len(laser)
+        self.obsy = y/len(laser)
         
-        print("Car coordinates: " + str(myx) + ", " + str(myy))
-        print("Car position: " + str(myyaw))
-        print("Target coordinates: " + str(self.targetx) + ", "
-              + str(self.targety))
-        print("Laser data: " + str(laser))
+        # Average direction
+        self.avgx = 5.0
+        self.avgy = 5.0
         
         v = 3
         w = 0
         # We set the car velocities.
-        self.motors.setV(v)
-        self.motors.setW(w)
+        self.motors.setV(10)
+        self.motors.setW(0)
+        self.motors.sendVelocities()
 
         
 
