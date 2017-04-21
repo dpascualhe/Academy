@@ -7,7 +7,7 @@ import math
 from Target import Target
 from Parser import Parser
 
-time_cycle = 80
+time_cycle = 120
 
 class MyAlgorithm(threading.Thread):
 
@@ -136,12 +136,17 @@ class MyAlgorithm(threading.Thread):
             self.currentTarget.setReached(True)
             
         # We apply axis translation and rotation to get the relative 
-        # target coordinates with respect to
-        # to the car position
+        # target coordinates with respect to the car position.
         transx = self.targetx - myx
         transy = self.targety - myy
-        self.carx = (transx * math.cos(myyaw)) + (transy * math.sin(myyaw))
-        self.cary = -(transx * math.sin(myyaw)) + (transy * math.cos(myyaw))
+        rotx = (transx * math.cos(myyaw)) + (transy * math.sin(myyaw))
+        roty = -(transx * math.sin(myyaw)) + (transy * math.cos(myyaw))
+        target_module = math.sqrt((rotx ** 2) + (roty ** 2))
+        if target_module > 3:
+            target_module = 3
+        target_angle = math.atan2(roty, rotx)
+        self.carx = target_module * math.cos(target_angle)
+        self.cary = target_module * math.sin(target_angle)
         print("Relative target: ", self.carx, self.cary)
 
         # We get the laser data.
@@ -149,7 +154,7 @@ class MyAlgorithm(threading.Thread):
         laser = []
         for i in range(laser_data.numLaser):
             distance = laser_data.distanceData[i]/1000.
-            yaw = math.radians(i)
+            yaw = math.radians(i) - math.pi
             laser += [(distance, yaw)]
             
         # We enlarge the obstacles.
@@ -159,39 +164,48 @@ class MyAlgorithm(threading.Thread):
             data[0] = data[0] - car_radius
             laser[i] = tuple(data)
             
-        #=======================================================================
-        # # Obstacles direction
-        # x = 0
-        # y = 0
-        # for i in range(len(laser)):
-        #     x += laser[i][0] * math.cos(laser[i][1])
-        #     y += laser[i][0] * math.sin(laser[i][1]) 
-        # self.obsx = x/len(laser)
-        # self.obsy = y/len(laser)
-        # 
-        # # Average direction
-        # alfa = 0.02
-        # beta = 1.2
-        # self.avgx = alfa * self.carx + beta * self.obsx
-        # self.avgy = alfa * self.cary + beta * self.obsy
-        #=======================================================================
+        # Obstacles direction
+        x = 0
+        y = 0
+        for i in range(len(laser)):
+            x += laser[i][0] * math.cos(laser[i][1])
+            y += laser[i][0] * math.sin(laser[i][1]) 
+        self.obsx = x/len(laser)
+        self.obsy = y/len(laser)
+        print("Obstacles: ", self.obsx, self.obsy)
+         
+        # Average direction
+        alfa = 0.25
+        beta = 0.5
+        self.avgx = alfa * self.carx + beta * self.obsx
+        self.avgy = alfa * self.cary + beta * self.obsy
         
-        #=======================================================================
-        # module = math.sqrt((self.avgx ** 2) + (self.avgy ** 2))
-        # angle = math.atan(self.avgy / self.avgx)
-        #=======================================================================
-        #print("Avg: ", module, angle)
+        module = math.sqrt((self.avgx ** 2) + (self.avgy ** 2))
+        angle = math.atan(self.avgy / self.avgx)
+        print("Avg: ", module, angle)
         
-        #=======================================================================
-        # v = module
-        angle =  math.atan2(self.carx, self.cary)
-        if math.pi/2 + 0.1 >= angle >= math.pi/2 - 0.1:
+        v = module
+        angle =  math.atan2(self.avgy, self.avgx)
+        if -math.pi/2 + 0.1 >= angle >= -math.pi/2 - 0.1:
             w = 0
         else:
-            w = angle - (math.pi / 2)
+            w = (angle + math.pi/2) / 2
+            if w > 2:
+                w = 2
+            if w < -2:
+                w = -2
+        
         #=======================================================================
+        # if (w == 2) or (w == -2):
+        #     v = 1
+        # elif w == 0:
+        #     v = 5
+        # else:
+        #     v = 2
+        #=======================================================================
+
         # We set the car velocities.
-        self.motors.setV(5)
+        self.motors.setV(2)
         self.motors.setW(w)
         self.motors.sendVelocities()
 
