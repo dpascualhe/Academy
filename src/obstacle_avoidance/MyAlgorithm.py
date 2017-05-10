@@ -128,25 +128,22 @@ class MyAlgorithm(threading.Thread):
         # We get the car coordinates and orientation.
         myx = self.pose3d.getX()/1000.
         myy = self.pose3d.getY()/1000.
-        myyaw = self.pose3d.getYaw()
+        myyaw = -self.pose3d.getYaw()
         print("Car: ", myx, myy, myyaw)
         
-        if ((myx + 1 >= self.targetx >= myx - 1) 
-            and (myy + 1 >= self.targety >= myy - 1)):
+        if ((myx + 2 >= self.targetx >= myx - 2) 
+            and (myy + 2 >= self.targety >= myy - 2)):
             self.currentTarget.setReached(True)
             
         # We apply axis translation and rotation to get the relative 
         # target coordinates with respect to the car position.
         transx = self.targetx - myx
         transy = self.targety - myy
-        rotx = (transx * math.cos(myyaw)) + (transy * math.sin(myyaw))
-        roty = -(transx * math.sin(myyaw)) + (transy * math.cos(myyaw))
-        target_module = math.sqrt((rotx ** 2) + (roty ** 2))
-        if target_module > 3:
-            target_module = 3
-        target_angle = math.atan2(roty, rotx)
-        self.carx = target_module * math.cos(target_angle)
-        self.cary = target_module * math.sin(target_angle)
+        rotx = (transx * math.cos(myyaw)) - (transy * math.sin(myyaw))
+        roty = (transx * math.sin(myyaw)) + (transy * math.cos(myyaw))
+        
+        self.carx = rotx
+        self.cary = roty
         print("Relative target: ", self.carx, self.cary)
 
         # We get the laser data.
@@ -154,7 +151,7 @@ class MyAlgorithm(threading.Thread):
         laser = []
         for i in range(laser_data.numLaser):
             distance = laser_data.distanceData[i]/1000.
-            yaw = math.radians(i) - math.pi
+            yaw = math.radians(i)
             laser += [(distance, yaw)]
             
         # We enlarge the obstacles.
@@ -168,15 +165,23 @@ class MyAlgorithm(threading.Thread):
         x = 0
         y = 0
         for i in range(len(laser)):
-            x += laser[i][0] * math.cos(laser[i][1])
-            y += laser[i][0] * math.sin(laser[i][1]) 
+            x -= laser[i][0] * math.cos(laser[i][1])
+            y -= laser[i][0] * math.sin(laser[i][1])
+        
         self.obsx = x/len(laser)
         self.obsy = y/len(laser)
         print("Obstacles: ", self.obsx, self.obsy)
          
         # Average direction
         alfa = 0.25
-        beta = 0.5
+        beta = 1.25
+        car_module = math.sqrt((self.carx ** 2) + (self.cary ** 2))
+        car_angle = math.atan2(self.cary, self.carx)
+        if car_module > 5:
+            car_module = 5
+            self.carx = car_module*math.cos(car_angle)
+            self.cary = car_module*math.sin(car_angle)
+
         self.avgx = alfa * self.carx + beta * self.obsx
         self.avgy = alfa * self.cary + beta * self.obsy
         
@@ -189,23 +194,21 @@ class MyAlgorithm(threading.Thread):
         if -math.pi/2 + 0.1 >= angle >= -math.pi/2 - 0.1:
             w = 0
         else:
-            w = (angle + math.pi/2) / 2
-            if w > 2:
-                w = 2
-            if w < -2:
-                w = -2
+            w = (angle + math.pi/2)
+            if w > 1:
+                w = 1
+            if w < -1:
+                w = -1
         
-        #=======================================================================
-        # if (w == 2) or (w == -2):
-        #     v = 1
-        # elif w == 0:
-        #     v = 5
-        # else:
-        #     v = 2
-        #=======================================================================
+        if (w == 1) or (w == -1):
+            v = 1
+        elif w == 0:
+            v = 8
+        else:
+            v = (math.pi/2 - abs(w)) * 2
 
         # We set the car velocities.
-        self.motors.setV(2)
+        self.motors.setV(v)
         self.motors.setW(w)
         self.motors.sendVelocities()
 
