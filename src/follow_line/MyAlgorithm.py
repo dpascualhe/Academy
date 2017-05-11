@@ -121,13 +121,7 @@ class MyAlgorithm(threading.Thread):
 
         # PD control.
         kp = 1
-        kd = 4
-        if (abs(tmp_upper_center - tmp_lower_center) > 30):
-            v = 2
-        elif (abs(30 > tmp_upper_center - tmp_lower_center) > 10):
-            v = 4  
-        else:
-            v = 6
+        kd = 8
 
         if error:
             print("error: " + str(error))
@@ -139,15 +133,22 @@ class MyAlgorithm(threading.Thread):
             w = 0
         
         self.derivator = error
+        
+        if abs(w) > 0.4:
+            v = abs((1-w)*2.2)
+        elif abs(w) > 0.1:
+            v = 4
+        else:
+            v = 7
 
         # Sending parameters to actuators.
         self.motors.setV(v)
         self.motors.setW(w)
         self.motors.sendVelocities()
         
-        im_line[:,tmp_lower_center] = [255, 0, 0]
-        im_line[:,tmp_uppper_center] = [0, 0, 255]
-        im_line[:,self.abs_center] = [0, 255, 0]
+        im_line[:,int(tmp_lower_center)] = [255, 0, 0]
+        im_line[:,int(tmp_upper_center)] = [0, 0, 255]
+        im_line[:,int(self.abs_center)] = [0, 255, 0]
         self.setLeftImageFiltered(im_line) # Displaying filtered image.
 
 

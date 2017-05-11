@@ -151,8 +151,9 @@ class MyAlgorithm(threading.Thread):
         laser = []
         for i in range(laser_data.numLaser):
             distance = laser_data.distanceData[i]/1000.
-            yaw = math.radians(i)
-            laser += [(distance, yaw)]
+            if distance < 5:
+                yaw = math.radians(i)
+                laser += [(distance, yaw)]
             
         # We enlarge the obstacles.
         car_radius = 1
@@ -173,12 +174,12 @@ class MyAlgorithm(threading.Thread):
         print("Obstacles: ", self.obsx, self.obsy)
          
         # Average direction
-        alfa = 0.25
-        beta = 1.25
+        alfa = 0.15
+        beta = 1
         car_module = math.sqrt((self.carx ** 2) + (self.cary ** 2))
         car_angle = math.atan2(self.cary, self.carx)
-        if car_module > 5:
-            car_module = 5
+        if car_module > 3:
+            car_module = 3
             self.carx = car_module*math.cos(car_angle)
             self.cary = car_module*math.sin(car_angle)
 
@@ -195,12 +196,13 @@ class MyAlgorithm(threading.Thread):
             w = 0
         else:
             w = (angle + math.pi/2)
-            if w > 1:
-                w = 1
-            if w < -1:
-                w = -1
+            print(w)
+            if w > 0.5:
+                w = 1.5
+            if w < -0.5:
+                w = -1.5
         
-        if (w == 1) or (w == -1):
+        if (w == 1.5) or (w == -1.5):
             v = 1
         elif w == 0:
             v = 8
